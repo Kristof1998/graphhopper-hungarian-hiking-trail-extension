@@ -119,7 +119,7 @@ jobs:
 
       - name: Add license to jel symbols
         run: |
-          curl -sf https://www.gnu.org/licenses/gpl-3.0.txt -o jel-symbols/LICENSE
+          cp bundle-assets/jel-symbols/LICENSE jel-symbols/LICENSE
           cp bundle-assets/jel-symbols/README.md jel-symbols/README.md
 
       - name: Zip artifacts
