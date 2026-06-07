@@ -1,3 +1,238 @@
+# GraphHopper Routing Engine – Hungarian Hiking Trail Extension
+
+> **This is a fork of [graphhopper/graphhopper](https://github.com/graphhopper/graphhopper)** extended with Hungarian hiking trail data (`jel`, `osmc:symbol`, route names) exposed via the routing API.
+
+---
+
+## Quick Start (pre-built release)
+
+Download a release from the [Releases](../../releases) page and start the server in two steps — no build, no OSM import needed.
+
+**Release assets:**
+
+| File                    | Description                                                                                                             |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `graphhopper-web-*.jar` | GraphHopper web server                                                                                                  |
+| `graph-cache.zip`       | Pre-built graph for Hungary — extract to skip the import                                                                |
+| `jel-symbols.zip`       | SVG icons for Hungarian trail markers (one file per `jel` value)                                                        |
+| `not-found-jel.txt`     | `jel` values that have no icon in [waymarkedtrails-shields](https://github.com/waymarkedtrails/waymarkedtrails-shields) |
+| `seen_jel_values.txt`   | All unique `jel` values found in the Hungary OSM data at build time                                                     |
+
+**Releases are versioned as:**
+- `v1.0.0` — stable
+- `v1.0.0-beta` — feature-complete, may have minor issues
+- `v1.0.0-alpha` — work in progress
+
+**Steps:**
+
+```bash
+# 1. Extract the pre-built graph next to the JAR
+unzip graph-cache.zip
+
+# 2. Start the server — loads from cache in ~10 seconds
+java -jar graphhopper-web-*.jar server config-hungary.yml
+```
+
+The server is available at `http://localhost:8989`.
+
+**Example request:**
+```
+GET http://localhost:8989/route?point=48.08501,20.50154&point=48.06087,20.63089&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name
+```
+
+---
+
+## Graph Cache
+
+The graph cache is a pre-processed binary representation of the OSM road network, built during the first run (the "import" step). It allows the server to start in seconds instead of spending 5–60 minutes re-processing the raw OSM file on every start.
+
+**Without the pre-built cache:** on first run, GraphHopper reads `hungary-latest.osm.pbf` and builds `graph-cache/` from scratch. This takes ~5–60 minutes and requires ~4 GB RAM for Hungary. After that, subsequent starts are instant.
+
+**With the pre-built cache** (from `graph-cache.zip` in the release): the import is skipped entirely. The server loads the ready graph in ~10 seconds.
+
+> **Important:** if `graph.encoded_values` in the config changes, or if the JAR is updated with a different graph format, delete `graph-cache/` and let GraphHopper reimport. Running with a stale cache will fail with a state mismatch error.
+
+---
+
+## How Hiking Data Is Added
+
+During OSM import, `OSMHikingSymbolParser` reads every relation tagged `route=hiking` or `route=foot` and attaches three values to each road segment (edge) that the relation covers:
+
+| Field             | Source OSM tag                | Stored as                        |
+|-------------------|-------------------------------|----------------------------------|
+| `hike_jel`        | `jel` on the relation         | `StringEncodedValue` on the edge |
+| `osmc_symbol`     | `osmc:symbol` on the relation | `StringEncodedValue` on the edge |
+| `hike_route_name` | `name` on the relation        | `StringEncodedValue` on the edge |
+
+**Multiple routes per segment:** when two or more hiking relations cross the same road segment, all their values are accumulated and stored as a `|`-delimited string. Duplicates are suppressed.
+
+Example: if a segment belongs to routes with `jel=k` and `jel=s+`, the stored value is `"k|s+"`.
+
+These values are then exposed via the `details` query parameter on the `/route` endpoint.
+
+---
+
+## API Reference
+
+### Route endpoint
+
+```
+GET http://localhost:8989/route
+```
+
+| Parameter | Required | Description                         | Example                   |
+|-----------|----------|-------------------------------------|---------------------------|
+| `point`   | yes (×2) | Start/end point as `lat,lon`        | `point=48.08501,20.50154` |
+| `profile` | yes      | Routing profile                     | `profile=hike`            |
+| `details` | no       | Per-segment trail fields to include | `details=hike_jel`        |
+| `locale`  | no       | Language for turn instructions      | `locale=hu`               |
+
+Available `details` values: `hike_jel`, `osmc_symbol`, `hike_route_name`.
+
+**Full example:**
+```
+GET http://localhost:8989/route?point=48.08501,20.50154&point=48.06087,20.63089&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name
+```
+
+### Response – `details` field
+
+Each detail is returned as a list of intervals: `[startIndex, endIndex, value]`.
+
+- `startIndex` / `endIndex` — index range into the `points` polyline
+- `value` — a plain string; `|`-delimited if multiple routes share that segment; empty string `""` if no route covers the segment
+
+```json
+"details": {
+  "hike_jel": [
+    [0,   11,  ""],
+    [11,  79,  "k+"],
+    [79,  106, "k+|k"],
+    [106, 191, "k"],
+    [191, 281, "k4"],
+    [281, 377, "s"],
+    [377, 436, ""]
+  ],
+  "osmc_symbol": [
+    [0,   11,  ""],
+    [11,  106, "blue:white:blue_cross"],
+    [106, 191, "blue:white:blue_bar"],
+    [191, 281, "blue:white:blue_rectangle|blue:white:blue_bar"],
+    [281, 377, "yellow:white:yellow_bar"],
+    [377, 436, ""]
+  ],
+  "hike_route_name": [
+    [0,   11,  ""],
+    [11,  191, "K+ (Nagy-mező)"],
+    [191, 281, "K■ (Lusta-völgy – Hollóstető)|Bükki Kék (B.A.Z. megye)"],
+    [281, 377, "S, Jubileumi körtúra 2."],
+    [377, 436, ""]
+  ]
+}
+```
+
+**Parsing multiple values (JavaScript):**
+```js
+const jelRaw = interval[2];                  // e.g. "k+|s"
+const jelList = jelRaw ? jelRaw.split("|") : []; // ["k+", "s"]
+```
+
+### Available profiles
+
+| Profile | Description                                            |
+|---------|--------------------------------------------------------|
+| `hike`  | Hiking — prefers marked trails, accounts for elevation |
+| `foot`  | General pedestrian routing                             |
+
+---
+
+## Building from Source
+
+**Prerequisites:** Java 17+, Maven 3.x
+
+```bash
+mvn package -DskipTests -Dmaven.javadoc.skip=true
+# → web/target/graphhopper-web-12.0-SNAPSHOT.jar
+```
+
+### Configuration
+
+The repository includes `config-hungary.yml` for running with the Hungary OSM extract:
+
+```yaml
+graphhopper:
+  datareader.file: hungary-latest.osm.pbf
+  graph.location: graph-cache
+
+  profiles:
+    - name: hike
+      custom_model_files: [hike.json]
+    - name: foot
+      custom_model_files: [foot.json, foot_elevation.json]
+
+  graph.encoded_values: >
+    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network,
+    hike_rating, average_slope,
+    osmc_symbol, hike_jel, hike_route_name
+  ...
+```
+
+> `osmc_symbol`, `hike_jel` and `hike_route_name` must be present in `graph.encoded_values`; otherwise the `details` fields will not be available.
+
+### First run (with OSM import)
+
+```bash
+# Download Hungary OSM extract (~270 MB)
+wget https://download.geofabrik.de/europe/hungary-latest.osm.pbf
+
+# Start — GraphHopper imports on first run (20–60 min, needs ~4 GB RAM)
+java -Xmx4g -jar graphhopper-web-*.jar server config-hungary.yml
+```
+
+Subsequent starts skip the import and load the cache in ~10 seconds.
+
+---
+
+## Updating Map Data
+
+```bash
+# Download fresh OSM extract
+wget -O hungary-latest.osm.pbf https://download.geofabrik.de/europe/hungary-latest.osm.pbf
+
+# Delete old cache, then restart (reimport runs automatically)
+rm -rf graph-cache/
+java -Xmx4g -jar graphhopper-web-*.jar server config-hungary.yml
+```
+
+Geofabrik publishes updated Hungary extracts daily; the `hungary-latest.osm.pbf` URL always points to the newest version.
+
+---
+
+## CI/CD & Releases
+
+### `hiking-release.yml` — Full data release (manual only)
+
+Triggered from **Actions → Hiking Data Release → Run workflow**. Inputs: **version** (e.g. `1.0.0`) and **release type** (`alpha` / `beta` / `stable`).
+
+The workflow:
+1. Builds the JAR
+2. Computes and pushes a git tag on master (`v1.0.0-beta` / `v1.0.0-alpha` / `v1.0.0`)
+3. Downloads the latest Hungary OSM map from Geofabrik
+4. Runs `java -jar ... import config-hungary.yml` — builds the graph and exits cleanly (no server started)
+5. Exports all unique `jel` values to `seen_jel_values.txt` (via JVM shutdown hook)
+6. Downloads SVG icons for each `jel` value from [waymarkedtrails-shields](https://github.com/waymarkedtrails/waymarkedtrails-shields)
+7. Publishes a GitHub Release with all artifacts (alpha/beta marked as pre-release)
+
+> Runs on ubuntu-latest (7 GB RAM). The import step needs ~2–4 GB and takes 30–60 minutes. Free for public repositories.
+
+### Exporting jel values locally
+
+```bash
+java -Xmx4g -Dhiking.exportJelValues=true \
+  -jar graphhopper-web-*.jar server config-hungary.yml
+# Stop with Ctrl+C → seen_jel_values.txt and seen_osmc_values.txt appear in the working directory
+```
+---
+
 # GraphHopper Routing Engine
 
 ![Build Status](https://github.com/graphhopper/graphhopper/actions/workflows/build.yml/badge.svg?branch=master)

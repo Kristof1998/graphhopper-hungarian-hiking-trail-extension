@@ -219,6 +219,12 @@ public class DefaultImportRegistry implements ImportRegistry {
             return ImportUnit.create(name, props -> MaxSlope.create(), null);
         else if (BikeNetwork.KEY.equals(name) || MtbNetwork.KEY.equals(name) || FootNetwork.KEY.equals(name))
             return ImportUnit.create(name, props -> RouteNetwork.create(name), null);
+        else if (OsmcSymbol.KEY.equals(name))
+            return ImportUnit.create(name, props -> OsmcSymbol.create(), null);
+        else if (HikeJel.KEY.equals(name))
+            return ImportUnit.create(name, props -> HikeJel.create(), null);
+        else if (HikeRouteName.KEY.equals(name))
+            return ImportUnit.create(name, props -> HikeRouteName.create(), null);
 
         else if (BusAccess.KEY.equals(name))
             return ImportUnit.create(name, props -> BusAccess.create(),

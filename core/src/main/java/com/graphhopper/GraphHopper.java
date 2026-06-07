@@ -45,6 +45,7 @@ import com.graphhopper.routing.subnetwork.PrepareRoutingSubnetworks.PrepareJob;
 import com.graphhopper.routing.util.*;
 import com.graphhopper.routing.util.parsers.OSMBikeNetworkTagParser;
 import com.graphhopper.routing.util.parsers.OSMFootNetworkTagParser;
+import com.graphhopper.routing.util.parsers.OSMHikingSymbolParser;
 import com.graphhopper.routing.util.parsers.TagParser;
 import com.graphhopper.routing.weighting.Weighting;
 import com.graphhopper.routing.weighting.custom.CustomModelParser;
@@ -667,6 +668,12 @@ public class GraphHopper {
             osmParsers.addRelationTagParser(relConfig -> new OSMBikeNetworkTagParser(encodingManager.getEnumEncodedValue(MtbNetwork.KEY, RouteNetwork.class), relConfig, "mtb"));
         if (encodingManager.hasEncodedValue(FootNetwork.KEY))
             osmParsers.addRelationTagParser(relConfig -> new OSMFootNetworkTagParser(encodingManager.getEnumEncodedValue(FootNetwork.KEY, RouteNetwork.class), relConfig));
+        if (encodingManager.hasEncodedValue(OsmcSymbol.KEY) || encodingManager.hasEncodedValue(HikeJel.KEY) || encodingManager.hasEncodedValue(HikeRouteName.KEY)) {
+            StringEncodedValue osmcEnc = encodingManager.hasEncodedValue(OsmcSymbol.KEY) ? encodingManager.getStringEncodedValue(OsmcSymbol.KEY) : null;
+            StringEncodedValue jelEnc = encodingManager.hasEncodedValue(HikeJel.KEY) ? encodingManager.getStringEncodedValue(HikeJel.KEY) : null;
+            StringEncodedValue nameEnc = encodingManager.hasEncodedValue(HikeRouteName.KEY) ? encodingManager.getStringEncodedValue(HikeRouteName.KEY) : null;
+            osmParsers.addRelationTagParser(relConfig -> new OSMHikingSymbolParser(osmcEnc, jelEnc, nameEnc, relConfig));
+        }
 
         restrictionVehicleTypesByProfile.forEach((profile, restrictionVehicleTypes) -> {
             osmParsers.addRestrictionTagParser(new RestrictionTagParser(

@@ -1,0 +1,166 @@
+name: Hiking Data Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g. 1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - alpha
+          - beta
+          - stable
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed for git tag push and creating the release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so we can push tags
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build JAR
+        run: mvn -B package -DskipTests -Dmaven.javadoc.skip=true
+
+      - name: Resolve JAR path
+        id: jar
+        run: |
+          JAR=$(ls web/target/graphhopper-web-*.jar | grep -v sources | head -1)
+          echo "path=$JAR" >> $GITHUB_OUTPUT
+          echo "name=$(basename $JAR)" >> $GITHUB_OUTPUT
+
+      - name: Fetch OSM map date
+        id: map
+        run: |
+          LAST_MOD=$(curl -sI "https://download.geofabrik.de/europe/hungary-latest.osm.pbf" \
+            | grep -i "^last-modified:" | head -1 | tr -d '\r\n' \
+            | sed 's/[Ll]ast-[Mm]odified: //')
+          MAP_DATE=$(date -d "$LAST_MOD" +%y%m%d)
+          echo "date=$MAP_DATE" >> $GITHUB_OUTPUT
+          echo "Map date: $MAP_DATE (from: $LAST_MOD)"
+
+      - name: Compute release metadata
+        id: meta
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TYPE="${{ github.event.inputs.release_type }}"
+          MAP_DATE="${{ steps.map.outputs.date }}"
+
+          if [ "$TYPE" = "stable" ]; then
+            TAG="v${VERSION}-${MAP_DATE}"
+            PRERELEASE=false
+          else
+            TAG="v${VERSION}-${TYPE}-${MAP_DATE}"
+            PRERELEASE=true
+          fi
+
+          echo "tag=$TAG"               >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+
+      - name: Tag master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.meta.outputs.tag }}
+          git push origin ${{ steps.meta.outputs.tag }}
+
+      - name: Download Hungary OSM map
+        run: |
+          echo "Downloading Hungary OSM extract from Geofabrik..."
+          wget -q --show-progress \
+            https://download.geofabrik.de/europe/hungary-latest.osm.pbf \
+            -O hungary-latest.osm.pbf
+          echo "Downloaded: $(du -sh hungary-latest.osm.pbf | cut -f1)"
+
+      - name: Import graph and export jel values
+        run: |
+          echo "Starting GraphHopper import (5-60 min)..."
+          java -Xmx4g \
+            -Dhiking.exportJelValues=true \
+            -jar ${{ steps.jar.outputs.path }} \
+            import config-hungary.yml
+          echo "Import complete. Graph cache: $(du -sh graph-cache | cut -f1)"
+
+      - name: Verify jel export
+        run: |
+          if [ ! -f seen_jel_values.txt ]; then
+            echo "::error::seen_jel_values.txt was not generated — check that -Dgraphhopper.exportJelValues=true is set"
+            exit 1
+          fi
+          echo "Unique jel values: $(wc -l < seen_jel_values.txt)"
+
+      - name: Download jel symbols
+        run: |
+          chmod +x download_jel_symbols.sh
+          ./download_jel_symbols.sh seen_jel_values.txt jel-symbols not-found-jel.txt
+
+      - name: Add license to jel symbols
+        run: |
+          curl -sf https://www.gnu.org/licenses/gpl-3.0.txt -o jel-symbols/LICENSE
+          cp bundle-assets/jel-symbols/README.md jel-symbols/README.md
+
+      - name: Zip artifacts
+        run: |
+          zip -r graph-cache.zip graph-cache/
+          zip -r jel-symbols.zip jel-symbols/
+          echo "graph-cache.zip: $(du -sh graph-cache.zip | cut -f1)"
+          echo "jel-symbols.zip:  $(du -sh jel-symbols.zip | cut -f1)"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          body: |
+            ## GraphHopper Hiking Release ${{ steps.meta.outputs.tag }}
+
+            Hungarian hiking trail data with `osmc_symbol`, `hike_jel`, and `hike_route_name` encoded values.
+
+            | Asset | Description |
+            |---|---|
+            | `${{ steps.jar.outputs.name }}` | GraphHopper web server JAR |
+            | `graph-cache.zip` | Pre-built Hungary graph — extract to skip the import |
+            | `jel-symbols.zip` | Hungarian hiking trail symbols (SVG, from waymarkedtrails-shields) |
+            | `not-found-jel.txt` | `jel` values without a matching SVG symbol |
+            | `seen_jel_values.txt` | All unique `jel` values in the Hungary OSM data |
+
+            **Map source:** [Geofabrik Hungary](https://download.geofabrik.de/europe/hungary.html), map date: `${{ steps.map.outputs.date }}`
+
+            ### Quick start
+
+            ```bash
+            unzip graph-cache.zip
+            java -jar ${{ steps.jar.outputs.name }} server config-hungary.yml
+            ```
+          files: |
+            ${{ steps.jar.outputs.path }}
+            graph-cache.zip
+            jel-symbols.zip
+            not-found-jel.txt
+            seen_jel_values.txt
+          fail_on_unmatched_files: true

@@ -1,0 +1,40 @@
+graphhopper:
+
+  datareader.file: hungary-latest.osm.pbf
+  graph.location: graph-cache
+
+  profiles:
+    - name: hike
+      custom_model_files: [hike.json]
+    - name: foot
+      custom_model_files: [foot.json, foot_elevation.json]
+
+  profiles_ch:
+    - profile: hike
+
+  profiles_lm: []
+
+  graph.encoded_values: >
+    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network,
+    hike_rating, average_slope,
+    osmc_symbol, hike_jel, hike_route_name
+
+  graph.elevation.provider: srtm
+
+  prepare.min_network_size: 200
+  prepare.subnetworks.threads: 1
+
+  import.osm.ignored_highways: ''
+
+  graph.dataaccess.default_type: RAM_STORE
+
+  routing.non_ch.max_waypoint_distance: 1000000
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: localhost
+  admin_connectors:
+    - type: http
+      port: 8990
