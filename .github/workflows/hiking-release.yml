@@ -91,9 +91,8 @@ jobs:
       - name: Download Hungary OSM map
         run: |
           echo "Downloading Hungary OSM extract from Geofabrik..."
-          wget -q --show-progress \
-            https://download.geofabrik.de/europe/hungary-latest.osm.pbf \
-            -O hungary-latest.osm.pbf
+          wget -q -O hungary-latest.osm.pbf \
+            https://download.geofabrik.de/europe/hungary-latest.osm.pbf
           echo "Downloaded: $(du -sh hungary-latest.osm.pbf | cut -f1)"
 
       - name: Import graph and export jel values

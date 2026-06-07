@@ -3,38 +3,27 @@ graphhopper:
   datareader.file: hungary-latest.osm.pbf
   graph.location: graph-cache
 
+  import.osm.ignored_highways: ''
+
+  graph.encoded_values: >
+    car_access, car_average_speed, country, road_class, roundabout, max_speed, road_environment,
+    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network, hike_rating,
+    bike_access, bike_average_speed, bike_priority, bike_road_access, bike_network, mtb_rating, ferry_speed,
+    osmc_symbol, hike_jel, hike_route_name
+
   profiles:
     - name: hike
       custom_model_files: [hike.json]
     - name: foot
-      custom_model_files: [foot.json, foot_elevation.json]
-
-  profiles_ch:
-    - profile: hike
-
-  profiles_lm: []
-
-  graph.encoded_values: >
-    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network,
-    hike_rating, average_slope,
-    osmc_symbol, hike_jel, hike_route_name
-
-  graph.elevation.provider: srtm
-
-  prepare.min_network_size: 200
-  prepare.subnetworks.threads: 1
-
-  import.osm.ignored_highways: ''
-
-  graph.dataaccess.default_type: RAM_STORE
-
-  routing.non_ch.max_waypoint_distance: 1000000
+      custom_model_files: [foot.json]
+    - name: car
+      custom_model_files: [car.json]
 
 server:
   application_connectors:
     - type: http
       port: 8989
-      bind_host: localhost
   admin_connectors:
     - type: http
       port: 8990
+      bind_host: localhost # for security reasons bind to localhost
