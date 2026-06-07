@@ -124,8 +124,8 @@ jobs:
 
       - name: Zip artifacts
         run: |
-          zip -r graph-cache.zip graph-cache/
-          zip -r jel-symbols.zip jel-symbols/
+          cd graph-cache && zip -r ../graph-cache.zip * && cd ..
+          cd jel-symbols && zip -r ../jel-symbols.zip * && cd ..
           echo "graph-cache.zip: $(du -sh graph-cache.zip | cut -f1)"
           echo "jel-symbols.zip:  $(du -sh jel-symbols.zip | cut -f1)"
 
