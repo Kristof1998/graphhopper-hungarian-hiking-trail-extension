@@ -1,5 +1,8 @@
 graphhopper:
 
+  # To import from the raw OSM file instead of the pre-built graph cache, add:
+  # datareader.file: hungary-latest.osm.pbf
+
   graph.location: graph-cache
 
   import.osm.ignored_highways: ''
