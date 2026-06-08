@@ -4,18 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g. 1.0.0)'
+        description: 'Version (e.g. 1.0.0 or 1.0.0-alpha1)'
         required: true
         type: string
-      release_type:
-        description: 'Release type'
+      prerelease:
+        description: 'Mark as pre-release'
         required: true
-        default: 'beta'
-        type: choice
-        options:
-          - alpha
-          - beta
-          - stable
+        default: true
+        type: boolean
 
 jobs:
   build-and-release:
@@ -67,26 +63,9 @@ jobs:
         id: meta
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          TYPE="${{ github.event.inputs.release_type }}"
           MAP_DATE="${{ steps.map.outputs.date }}"
-
-          if [ "$TYPE" = "stable" ]; then
-            TAG="v${VERSION}-${MAP_DATE}"
-            PRERELEASE=false
-          else
-            TAG="v${VERSION}-${TYPE}-${MAP_DATE}"
-            PRERELEASE=true
-          fi
-
-          echo "tag=$TAG"               >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-
-      - name: Tag master
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.meta.outputs.tag }}
-          git push origin ${{ steps.meta.outputs.tag }}
+          TAG="v${VERSION}-${MAP_DATE}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Download Hungary OSM map
         run: |
@@ -134,7 +113,7 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.tag }}
-          prerelease: ${{ steps.meta.outputs.prerelease }}
+          prerelease: ${{ github.event.inputs.prerelease }}
           body: |
             ## GraphHopper Hiking Release ${{ steps.meta.outputs.tag }}
 
