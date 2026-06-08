@@ -25,7 +25,7 @@ The server starts at `http://localhost:8989`.
 
 **Example request:**
 ```
-GET http://localhost:8989/route?point=48.08501,20.50154&point=48.06087,20.63089&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name
+GET http://localhost:8989/route?point=48.066099,20.621898&point=48.054301,20.628044&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name&locale=hu
 ```
 
 ---
@@ -67,7 +67,7 @@ When multiple routes share a segment, values are stored as a `|`-delimited strin
 
 **Full example:**
 ```
-GET http://localhost:8989/route?point=48.08501,20.50154&point=48.06087,20.63089&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name
+GET http://localhost:8989/route?point=48.066099,20.621898&point=48.054301,20.628044&profile=hike&details=hike_jel&details=osmc_symbol&details=hike_route_name&locale=hu
 ```
 
 ### Response – `details` field

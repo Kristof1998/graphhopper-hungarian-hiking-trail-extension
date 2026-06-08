@@ -1,25 +1,26 @@
 graphhopper:
 
-  # To import from the raw OSM file instead of the pre-built graph cache, add:
+  # To import from the raw OSM file instead of the pre-built graph cache, uncomment:
   # datareader.file: hungary-latest.osm.pbf
 
   graph.location: graph-cache
 
-  import.osm.ignored_highways: ''
+  # Motorways and trunks are not accessible to pedestrians — skip them to reduce graph size and import time
+  import.osm.ignored_highways: motorway,trunk
+
+  graph.elevation.provider: srtm
 
   graph.encoded_values: >
-    car_access, car_average_speed, country, road_class, roundabout, max_speed, road_environment,
-    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network, hike_rating,
-    bike_access, bike_average_speed, bike_priority, bike_road_access, bike_network, mtb_rating, ferry_speed,
+    country, road_class, road_environment,
+    foot_access, foot_average_speed, foot_priority, foot_road_access, foot_network,
+    hike_rating, mtb_rating, average_slope, ferry_speed,
     osmc_symbol, hike_jel, hike_route_name
 
   profiles:
     - name: hike
-      custom_model_files: [hike.json]
+      custom_model_files: [hike.json, foot_elevation.json]
     - name: foot
-      custom_model_files: [foot.json]
-    - name: car
-      custom_model_files: [car.json]
+      custom_model_files: [foot.json, foot_elevation.json]
 
 server:
   application_connectors:
