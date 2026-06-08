@@ -131,10 +131,13 @@ jobs:
 
             ### Quick start
 
-            ```bash
-            unzip graph-cache.zip
-            java -jar ${{ steps.jar.outputs.name }} server config-hungary.yml
-            ```
+            1. Download `graphhopper-web-*.jar` and `graph-cache.zip`
+            2. Extract the graph cache next to the JAR: `unzip graph-cache.zip`
+            3. Download `config-hungary-example.yml` from the repo and place it next to the JAR
+            4. Start the server: `java -jar graphhopper-web-*.jar server config-hungary-example.yml`
+  
+            The server starts at `http://localhost:8989`.
+
           files: |
             ${{ steps.jar.outputs.path }}
             graph-cache.zip
